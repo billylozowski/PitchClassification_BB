@@ -1,0 +1,236 @@
+The purpose of this markdown script is to see if we can determine an objective number of pitch types thrown by baseball pitchers. To do this, we'll use in-game Trackman data, along with a few different analysis techniques.
+
+Analyses:
+1. Gaussian Mixture Models (GMM)
+__GMM assumes data is generated from a mixture of several Gaussian distributions, allowing for soft clustering (probabilistic assignment) and elliptical cluster shapes. This is particularly good when pitch types overlap (e.g., cutters vs. fastballs).__
+
+  Use case: Model uncertainty in pitch classifications; helpful when pitches transition fluidly between types.
+  
+2. HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise)
+__This is a variant of DBSCAN (Density-Based Spatial Clustering) that does not require k, and handles varying densities well.__
+
+Very good for identifying:
+- Dense pitch types
+- Sparse or rare types
+- Noise/outliers
+
+3. Autoencoder + Clustering (this is more advanced than I am currently comfortable with)
+__This approach trains an autoencoder (or variational autoencoder) to learn a compressed representation of the ball metrics. Then, it applies clustering (e.g., k-means or GMM) on the latent space.__
+
+Benefits:
+- Non-linear dimensionality reduction for better separation of similar pitch types.
+- Works well with noisy or high-dimensional data.
+- Variants: Deep Embedded Clustering (DEC), Variational Deep Embedding (VaDE)
+
+
+**Having run the GMM without break characteristics, I think it may be best to include these to help split pitches better. Currently, RHP and LHP are throwing 9 distinct pitch types each**
+
+
+If the packages below need to be installed, removed the "eval=FALSE" from the curly brackets
+```{r install packages if required, eval=FALSE}
+install.packages(c("mclust", "umap", "plotly", "scales", "tidyverse"))
+```
+
+First, let's load the packages we need to perform this analysis
+```{r load packages}
+library(mclust)
+library(umap)
+library(plotly)
+library(scales)
+library(tidyverse)
+```
+
+Now let's read in the data
+```{r load data}
+d <- read.csv("Data/master_TrackMan_2025.csv")
+```
+
+Given that we're only interested in the release characteristics right now, we're only going to rename those. If we want to expand beyong these, we can do so at a later date.
+```{r rename columns of interest}
+names(d)[names(d) == "RelSpeed"] <- "velocity"
+names(d)[names(d) == "VertRelAngle"] <- "vertical_release_angle"
+names(d)[names(d) == "HorzRelAngle"] <- "horizontal_release_angle"
+names(d)[names(d) == "SpinRate"] <- "spin_rate"
+names(d)[names(d) == "SpinAxis"] <- "spin_axis"
+names(d)[names(d) == "RelHeight"] <- "release_height"
+names(d)[names(d) == "RelSide"] <- "release_side"
+names(d)[names(d) == "Extension"] <- "extension"
+```
+
+Some of the columns we will be using are currently not in metric. We, therefore, need to convert these before proceeding.
+```{r metric conversion}
+d$velocity <- d$velocity * 0.44704
+d$release_height <- d$release_height * 0.3048
+d$release_side <- d$release_side * 0.3048
+d$extension <- d$extension * 0.3048
+```
+
+To better help the analysis of this data, we are going to separate out right- and left-handers. This is owing to **"horizontal_release_angle"**, **"spin_axis"**, and **"release_side"** being different for each group (the values are essentially flipped for left-handed throwers). We're also going to remove any rows where missing values are.
+```{r split data}
+d_right <- d %>%
+  filter(PitcherThrows == "Right") %>%
+  select(20:21, 29:33, 35:37)
+
+d_right <- d_right[complete.cases(d_right), ] # remove any rows where metrics might be missing
+
+d_left <-d %>%
+  filter(PitcherThrows == "Left") %>%
+  select(20:21, 29:33, 35:37)
+
+d_left <- d_left[complete.cases(d_left), ]   # remove any rows where metrics might be missing
+```
+
+Identify the features (ball metrics) that we're interested in.
+```{r features}
+features <- c("velocity", 
+              "vertical_release_angle", 
+              "horizontal_release_angle", 
+              "spin_rate", 
+              "spin_axis", 
+              "release_height", 
+              "release_side", 
+              "extension")
+```
+
+
+```{r right handed pitchers}
+rX <- scale(d_right[, features]) # scale features
+
+# fit Gaussian Mixture Model (GMM)
+gmm_modelr <- Mclust(rX)
+best_kr <- gmm_modelr$G
+d_right$cluster <- as.factor(gmm_modelr$classification)
+cat("Optimal number of clusters for RHP:", best_kr, "\n")
+
+# UMAP for dimensionality reduction
+# Uniform Manifold Approximation and Projection
+set.seed(0312)
+r_umap_result <- umap(rX)
+
+# create a UMAP dataframe with pitch type labels
+r_umap_df <- data.frame(
+  UMAP1 = r_umap_result$layout[, 1],
+  UMAP2 = r_umap_result$layout[, 2],
+  cluster = d_right$cluster,
+  velocity = d_right$velocity,
+  spin_rate = d_right$spin_rate,
+  spin_axis = d_right$spin_axis,
+  TaggedPitchType = d_right$TaggedPitchType,
+  AutoPitchType = d_right$AutoPitchType
+)
+
+# rhp interactive plot
+plot_rhp <- plot_ly(
+  r_umap_df,
+  x = ~UMAP1,
+  y = ~UMAP2,
+  type = 'scatter',
+  mode = 'markers',
+  color = ~cluster,
+  colors = hue_pal()(best_kr),
+  text = ~paste(
+    "Cluster:", cluster,
+    "<br>Tagged:", TaggedPitchType,
+    "<br>Auto:", AutoPitchType,
+    "<br>Velocity:", round(velocity, 1),
+    "<br>Spin Rate:", round(spin_rate, 0),
+    "<br>Spin Axis:", round(spin_axis, 0)
+  ),
+  marker = list(size = 8, opacity = 0.8)
+) %>%
+  layout(
+    title = "RHP GMM Clustering (UMAP Projection)",
+    xaxis = list(title = "UMAP1"),
+    yaxis = list(title = "UMAP2"),
+    legend = list(title = list(text = "Cluster"))
+  )
+```
+
+
+```{r left handed pitchers}
+lX <- scale(d_left[, features])  # scale features
+
+# fit Gaussian Mixture Model (GMM)
+gmm_modell <- Mclust(lX)
+best_kl <- gmm_modell$G
+d_left$cluster <- as.factor(gmm_modell$classification)
+cat("Optimal number of clusters for LHP:", best_kl, "\n")
+
+# UMAP for dimensionality reduction
+# Uniform Manifold Approximation and Projection
+set.seed(0312)
+l_umap_result <- umap(lX)
+
+# create a UMAP dataframe with pitch type labels
+l_umap_df <- data.frame(
+  UMAP1 = l_umap_result$layout[, 1],
+  UMAP2 = l_umap_result$layout[, 2],
+  cluster = d_left$cluster,
+  velocity = d_left$velocity,
+  spin_rate = d_left$spin_rate,
+  spin_axis = d_left$spin_axis,
+  TaggedPitchType = d_left$TaggedPitchType,
+  AutoPitchType = d_left$AutoPitchType
+)
+
+# lhp interactive plot
+plot_lhp <- plot_ly(
+  l_umap_df,
+  x = ~UMAP1,
+  y = ~UMAP2,
+  type = 'scatter',
+  mode = 'markers',
+  color = ~cluster,
+  colors = hue_pal()(best_kl),
+  text = ~paste(
+    "Cluster:", cluster,
+    "<br>Tagged:", TaggedPitchType,
+    "<br>Auto:", AutoPitchType,
+    "<br>Velocity:", round(velocity, 1),
+    "<br>Spin Rate:", round(spin_rate, 0),
+    "<br>Spin Axis:", round(spin_axis, 0)
+  ),
+  marker = list(size = 8, opacity = 0.8)
+) %>%
+  layout(
+    title = "LHP GMM Clustering (UMAP Projection)",
+    xaxis = list(title = "UMAP1"),
+    yaxis = list(title = "UMAP2"),
+    legend = list(title = list(text = "Cluster"))
+  )
+```
+
+View plots
+```{r plots}
+print(plot_rhp)
+print(plot_lhp)
+```
+UMAP isn't particularly helpful in terms of interpreting the data (clusters differences).
+
+```{r GGally}
+install.packages("GGally")
+library(GGally)
+
+GGally::ggparcoord(
+  data = d_right,
+  columns = which(names(d_right) %in% features),
+  groupColumn = "cluster",
+  scale = "uniminmax",
+  alphaLines = 0.3
+) +
+  theme_minimal() +
+  labs(title = "Cluster Profiles (RHP)", x = "Feature", y = "Normalized Value")
+
+```
+
+```{r UMAP with facet wrapping}
+library(ggplot2)
+
+ggplot(r_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(alpha = 0.7, size = 2) +
+  facet_wrap(~ cluster) +
+  theme_minimal() +
+  labs(title = "UMAP Faceted by Cluster (RHP)")
+
+```
+
