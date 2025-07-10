@@ -132,9 +132,9 @@ plot_rhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Tagged:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>Velocity:", round(velocity, 1),
-    "<br>Spin Rate:", round(spin_rate, 0),
-    "<br>Spin Axis:", round(spin_axis, 0)
+    "<br>Velocity (m.s):", round(velocity, 1),
+    "<br>Spin Rate (deg/s):", round(spin_rate, 0),
+    "<br>Spin Axis (deg):", round(spin_axis, 0)
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -186,9 +186,9 @@ plot_lhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Tagged:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>Velocity:", round(velocity, 1),
-    "<br>Spin Rate:", round(spin_rate, 0),
-    "<br>Spin Axis:", round(spin_axis, 0)
+    "<br>Velocity (m.s):", round(velocity, 1),
+    "<br>Spin Rate (deg/s):", round(spin_rate, 0),
+    "<br>Spin Axis (deg):", round(spin_axis, 0)
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -201,13 +201,139 @@ plot_lhp <- plot_ly(
 ```
 
 View plots
-```{r plots}
+```{r UMAP plots}
 print(plot_rhp)
 print(plot_lhp)
-```
-UMAP isn't particularly helpful in terms of interpreting the data (clusters differences).
 
-```{r GGally}
+# UMAP isn't particularly helpful in terms of interpreting the data (clusters differences).So, we'll need a different approach.
+```
+
+Summarise each cluster with quartiles and IQRs
+```{r IQR summary}
+# RHP
+cluster_summary_rhp <- d_right %>%
+  group_by(cluster) %>%
+  summarise(across(all_of(features), list(
+    Q1 = ~quantile(.x, 0.25, na.rm = TRUE),
+    Q3 = ~quantile(.x, 0.75, na.rm = TRUE),
+    median = ~median(.x, na.rm = TRUE),
+    IQR = ~IQR(.x, na.rm = TRUE)
+  ), .names = "{.col}_{.fn}")) %>%
+  ungroup()
+
+# save the summary data for RHP
+write.csv(cluster_summary_rhp, file = "Data/RHP Cluster Summary.csv", row.names = FALSE)
+
+# LHP
+cluster_summary_lhp <- d_left %>%
+  group_by(cluster) %>%
+  summarise(across(all_of(features), list(
+    Q1 = ~quantile(.x, 0.25, na.rm = TRUE),
+    Q3 = ~quantile(.x, 0.75, na.rm = TRUE),
+    median = ~median(.x, na.rm = TRUE),
+    IQR = ~IQR(.x, na.rm = TRUE)
+  ), .names = "{.col}_{.fn}")) %>%
+  ungroup()
+
+# save the summary data for LHP
+write.csv(cluster_summary_lhp, file = "Data/LHP Cluster Summary.csv", row.names = FALSE)
+
+# visualise each cluster's ball metrics for LHP
+
+```
+
+```{r cluster box plots + facet_wrap()}
+cluster_r <- d_right %>%
+  select(-TaggedPitchType, -AutoPitchType) %>%
+  pivot_longer(cols = -cluster,
+               names_to = "variable",
+               values_to = "value")
+
+ggplot(cluster_r, aes(x = variable, y = value, fill = cluster)) +
+  geom_boxplot(outlier.shape =  NA) +
+  facet_wrap(~variable, scales = "free") +
+  labs(title = "RHP") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+cluster_l <- d_left %>%
+  select(-TaggedPitchType, -AutoPitchType) %>%
+  pivot_longer(cols = -cluster,
+               names_to = "variable",
+               values_to = "value")
+
+ggplot(cluster_l, aes(x = variable, y = value, fill = cluster)) +
+  geom_boxplot(outlier.shape =  NA) +
+  facet_wrap(~variable, scales = "free") +
+  labs(title = "LHP") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r cluster box plots with purrr}
+install.packages("purrr")
+library(purrr)
+
+# split data by variable
+plots_r <- cluster_r %>%
+  split(.$variable) %>%
+  map(~ ggplot(.x, aes(x = cluster, y = value, fill = cluster)) +
+        geom_boxplot(outlier.shape = NA) +
+        geom_jitter(aes(fill = cluster),
+                    shape = 21,      
+                    position = position_jitter(width = 0.25),
+                    alpha = 0.3,
+                    size = 1.5,
+                    colour = "black") +
+        theme_classic() +
+        labs(x = "Pitch Cluster",
+             y = NULL,
+             title = paste0("RHP - ", unique(.x$variable))) +
+        theme(plot.title = element_text(hjust = 0.5),
+              legend.position = "none")
+      )
+
+# split data by variable
+plots_l <- cluster_l %>%
+  split(.$variable) %>%
+  map(~ ggplot(.x, aes(x = cluster, y = value, fill = cluster)) +
+        geom_boxplot(outlier.shape = NA) +
+        geom_jitter(aes(fill = cluster),
+                    shape = 21,      
+                    position = position_jitter(width = 0.25),
+                    alpha = 0.3,
+                    size = 1.5,
+                    colour = "black") +
+        theme_classic() +
+        labs(x = "Pitch Cluster",
+             y = NULL,
+             title = paste0("LHP - ", unique(.x$variable))) +
+        theme(plot.title = element_text(hjust = 0.5),
+              legend.position = "none")
+      )
+
+# loop through to print all
+walk(plots_r, print)
+walk(plots_l, print)
+
+# save each plot with a unique file name
+walk2(.x = plots_r,
+      .y = names(plots_r),
+      .f = ~ ggsave(filename = paste0("RHP - ", .y, ".png"),
+                    plot = .x,
+                    width = 7, height = 5, dpi = 600)
+      )
+
+walk2(.x = plots_l,
+      .y = names(plots_l),
+      .f = ~ ggsave(filename = paste0("LHP - ", .y, ".png"),
+                    plot = .x,
+                    width = 7, height = 5, dpi = 600)
+      )
+```
+
+
+```{r GGally - line plot}
 install.packages("GGally")
 library(GGally)
 
@@ -219,18 +345,28 @@ GGally::ggparcoord(
   alphaLines = 0.3
 ) +
   theme_minimal() +
+  facet_wrap(~cluster)
   labs(title = "Cluster Profiles (RHP)", x = "Feature", y = "Normalized Value")
 
+# these plots are difficult to interpret as they are. Unfortunately, GGally doesn't support facet_wrap() by variable!
 ```
+
 
 ```{r UMAP with facet wrapping}
 library(ggplot2)
 
 ggplot(r_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
   geom_point(alpha = 0.7, size = 2) +
-  facet_wrap(~ cluster) +
+  facet_wrap(~cluster) +
   theme_minimal() +
   labs(title = "UMAP Faceted by Cluster (RHP)")
 
+ggplot(l_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(alpha = 0.7, size = 2) +
+  facet_wrap(~cluster) +
+  theme_minimal() +
+  labs(title = "UMAP Faceted by Cluster (LHP)")
+
+# LHP is much easier to interpret than RHP!
 ```
 
