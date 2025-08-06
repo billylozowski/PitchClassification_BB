@@ -28,16 +28,17 @@ Benefits:
 
 If the packages below need to be installed, removed the "eval=FALSE" from the curly brackets
 ```{r install packages if required, eval=FALSE}
-install.packages(c("mclust", "umap", "plotly", "scales", "tidyverse"))
+install.packages(c("mclust", "umap", "plotly", "scales", "tidyverse", "dbscan"))
 ```
 
 First, let's load the packages we need to perform this analysis
-```{r load packages}
+```{r load packages, message=FALSE}
 library(mclust)
 library(umap)
 library(plotly)
 library(scales)
 library(tidyverse)
+library(dbscan)
 ```
 
 Now let's read in the data
@@ -45,7 +46,7 @@ Now let's read in the data
 d <- read.csv("Data/master_TrackMan_2025.csv")
 ```
 
-Given that we're only interested in the release characteristics right now, we're only going to rename those. If we want to expand beyong these, we can do so at a later date.
+Having seen no difference in the number of identified pitch clusters when running this analysis with both release characteristics, and break profiles separately, the decision was made to use break profiles exclusively. This was largely down to the fact that this approach allowed for a more interpretable visualisation of each model (something that release parameters struggled with).
 ```{r rename columns of interest}
 names(d)[names(d) == "RelSpeed"] <- "velocity"
 names(d)[names(d) == "VertRelAngle"] <- "vertical_release_angle"
@@ -55,6 +56,9 @@ names(d)[names(d) == "SpinAxis"] <- "spin_axis"
 names(d)[names(d) == "RelHeight"] <- "release_height"
 names(d)[names(d) == "RelSide"] <- "release_side"
 names(d)[names(d) == "Extension"] <- "extension"
+names(d)[names(d) == "InducedVertBreak"] <- "ivb"
+names(d)[names(d) == "VertBreak"] <- "vb"
+names(d)[names(d) == "HorzBreak"] <- "hb"
 ```
 
 Some of the columns we will be using are currently not in metric. We, therefore, need to convert these before proceeding.
@@ -63,25 +67,28 @@ d$velocity <- d$velocity * 0.44704
 d$release_height <- d$release_height * 0.3048
 d$release_side <- d$release_side * 0.3048
 d$extension <- d$extension * 0.3048
+d$ivb <- d$ivb * 0.0254
+d$vb <- d$vb * 0.0254
+d$hb <- d$hb * 0.0254
 ```
 
 To better help the analysis of this data, we are going to separate out right- and left-handers. This is owing to **"horizontal_release_angle"**, **"spin_axis"**, and **"release_side"** being different for each group (the values are essentially flipped for left-handed throwers). We're also going to remove any rows where missing values are.
 ```{r split data}
 d_right <- d %>%
   filter(PitcherThrows == "Right") %>%
-  select(20:21, 29:33, 35:37)
+  select(20:21, 29:33, 35:40)
 
 d_right <- d_right[complete.cases(d_right), ] # remove any rows where metrics might be missing
 
 d_left <-d %>%
   filter(PitcherThrows == "Left") %>%
-  select(20:21, 29:33, 35:37)
+  select(20:21, 29:33, 35:40)
 
 d_left <- d_left[complete.cases(d_left), ]   # remove any rows where metrics might be missing
 ```
 
 Identify the features (ball metrics) that we're interested in.
-```{r features}
+```{r features - release parameters}
 features <- c("velocity", 
               "vertical_release_angle", 
               "horizontal_release_angle", 
@@ -89,18 +96,27 @@ features <- c("velocity",
               "spin_axis", 
               "release_height", 
               "release_side", 
-              "extension")
+              "extension",
+              "vb",
+              "ivb",
+              "hb")
+```
+
+```{r features - break profile}
+features2 <- c("vb",
+               "ivb",
+               "hb")
 ```
 
 
 ```{r right handed pitchers}
-rX <- scale(d_right[, features]) # scale features
+rX <- scale(d_right[, features2]) # scale features
 
 # fit Gaussian Mixture Model (GMM)
 gmm_modelr <- Mclust(rX)
 best_kr <- gmm_modelr$G
 d_right$cluster <- as.factor(gmm_modelr$classification)
-cat("Optimal number of clusters for RHP:", best_kr, "\n")
+cat("Optimal number of clusters for RHP based on break profile:", best_kr, "\n")
 
 # UMAP for dimensionality reduction
 # Uniform Manifold Approximation and Projection
@@ -112,9 +128,12 @@ r_umap_df <- data.frame(
   UMAP1 = r_umap_result$layout[, 1],
   UMAP2 = r_umap_result$layout[, 2],
   cluster = d_right$cluster,
-  velocity = d_right$velocity,
-  spin_rate = d_right$spin_rate,
-  spin_axis = d_right$spin_axis,
+  inducedVB = d_right$ivb,
+  VB = d_right$vb,
+  HB = d_right$hb,
+  # velocity = d_right$velocity,
+  # spin_rate = d_right$spin_rate,
+  # spin_axis = d_right$spin_axis,
   TaggedPitchType = d_right$TaggedPitchType,
   AutoPitchType = d_right$AutoPitchType
 )
@@ -132,9 +151,12 @@ plot_rhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Tagged:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>Velocity (m.s):", round(velocity, 1),
-    "<br>Spin Rate (deg/s):", round(spin_rate, 0),
-    "<br>Spin Axis (deg):", round(spin_axis, 0)
+    "<br>Induced VB (deg):", round(inducedVB, 2),
+    "<br>VB (deg):", round(VB, 2),
+    "<br>HB (deg):", round(HB, 2)
+    # "<br>Velocity (m.s):", round(velocity, 1),
+    # "<br>Spin Rate (deg/s):", round(spin_rate, 0),
+    # "<br>Spin Axis (deg):", round(spin_axis, 0)
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -148,13 +170,13 @@ plot_rhp <- plot_ly(
 
 
 ```{r left handed pitchers}
-lX <- scale(d_left[, features])  # scale features
+lX <- scale(d_left[, features2])  # scale features
 
 # fit Gaussian Mixture Model (GMM)
 gmm_modell <- Mclust(lX)
 best_kl <- gmm_modell$G
 d_left$cluster <- as.factor(gmm_modell$classification)
-cat("Optimal number of clusters for LHP:", best_kl, "\n")
+cat("Optimal number of clusters for LHP based on break profile:", best_kl, "\n")
 
 # UMAP for dimensionality reduction
 # Uniform Manifold Approximation and Projection
@@ -166,9 +188,12 @@ l_umap_df <- data.frame(
   UMAP1 = l_umap_result$layout[, 1],
   UMAP2 = l_umap_result$layout[, 2],
   cluster = d_left$cluster,
-  velocity = d_left$velocity,
-  spin_rate = d_left$spin_rate,
-  spin_axis = d_left$spin_axis,
+  inducedVB = d_left$ivb,
+  VB = d_left$vb,
+  HB = d_left$hb,
+  # velocity = d_left$velocity,
+  # spin_rate = d_left$spin_rate,
+  # spin_axis = d_left$spin_axis,
   TaggedPitchType = d_left$TaggedPitchType,
   AutoPitchType = d_left$AutoPitchType
 )
@@ -186,9 +211,12 @@ plot_lhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Tagged:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>Velocity (m.s):", round(velocity, 1),
-    "<br>Spin Rate (deg/s):", round(spin_rate, 0),
-    "<br>Spin Axis (deg):", round(spin_axis, 0)
+    "<br>Induced VB (deg):", round(inducedVB, 2),
+    "<br>VB (deg):", round(VB, 2),
+    "<br>HB (deg):", round(HB, 2)
+    # "<br>Velocity (m.s):", round(velocity, 1),
+    # "<br>Spin Rate (deg/s):", round(spin_rate, 0),
+    # "<br>Spin Axis (deg):", round(spin_axis, 0)
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -200,12 +228,46 @@ plot_lhp <- plot_ly(
   )
 ```
 
-View plots
+View Cluster plots
 ```{r UMAP plots}
 print(plot_rhp)
 print(plot_lhp)
 
+htmlwidgets::saveWidget(
+  widget = plot_rhp,
+  file = "UMAP for RHP Break Profile.html",
+  selfcontained = TRUE
+)
+
+htmlwidgets::saveWidget(
+  widget = plot_lhp,
+  file = "UMAP for LHP Break Profile.html",
+  selfcontained = TRUE
+)
+
 # UMAP isn't particularly helpful in terms of interpreting the data (clusters differences).So, we'll need a different approach.
+```
+
+
+```{r UMAP with facet wrapping}
+UMAP_rhp <- ggplot(r_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(alpha = 0.7, size = 2) +
+  facet_wrap(~cluster) +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = "UMAP Faceted by Cluster (RHP)")
+
+UMAP_lhp <- ggplot(l_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(alpha = 0.7, size = 2) +
+  facet_wrap(~cluster) +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = "UMAP Faceted by Cluster (LHP)")
+
+ggsave(UMAP_rhp, file = "UMAP Faceted by Cluster - RHP.png", dpi = 600)
+ggsave(UMAP_lhp, file = "UMAP Faceted by Cluster - LHP.png", dpi = 600)
+
+# these plots allow us to separate the UMAP into the individual clusters
 ```
 
 Summarise each cluster with quartiles and IQRs
@@ -237,11 +299,52 @@ cluster_summary_lhp <- d_left %>%
 
 # save the summary data for LHP
 write.csv(cluster_summary_lhp, file = "Data/LHP Cluster Summary.csv", row.names = FALSE)
-
-# visualise each cluster's ball metrics for LHP
-
 ```
 
+
+```{r pitches included in each cluster}
+pitchtype_summary_rhp_auto <- d_right %>%
+  group_by(cluster, AutoPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(cluster, desc(n))
+
+# save the auto tagged cluster summary data for RHP
+write.csv(pitchtype_summary_rhp_auto, file = "Data/RHP Auto Tagged Cluster Summary.csv", row.names = FALSE)
+
+pitchtype_summary_rhp_tagged <- d_right %>%
+  group_by(cluster, TaggedPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(cluster, desc(n))
+
+# save the tagged cluster summary data for RHP
+write.csv(pitchtype_summary_rhp_tagged, file = "Data/RHP Tagged Cluster Summary.csv", row.names = FALSE)
+
+pitchtype_summary_lhp_auto <- d_left %>%
+  group_by(cluster, AutoPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(cluster, desc(n))
+
+# save the auto tagged cluster summary data for RHP
+write.csv(pitchtype_summary_lhp_auto, file = "Data/LHP Auto Tagged Cluster Summary.csv", row.names = FALSE)
+
+pitchtype_summary_lhp_tagged <- d_left %>%
+  group_by(cluster, TaggedPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(cluster, desc(n))
+
+# save the tagged cluster summary data for RHP
+write.csv(pitchtype_summary_lhp_tagged, file = "Data/LHP Tagged Cluster Summary.csv", row.names = FALSE)
+```
+
+Visualise each cluster's ball metrics for LHP
 ```{r cluster box plots + facet_wrap()}
 cluster_r <- d_right %>%
   select(-TaggedPitchType, -AutoPitchType) %>%
@@ -268,6 +371,8 @@ ggplot(cluster_l, aes(x = variable, y = value, fill = cluster)) +
   labs(title = "LHP") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
+
+# these plots are a little conjested, so we'll use facet_wrap() to panel them into single variables
 ```
 
 ```{r cluster box plots with purrr}
@@ -330,10 +435,12 @@ walk2(.x = plots_l,
                     plot = .x,
                     width = 7, height = 5, dpi = 600)
       )
+
+# these plots make it much easier to interpret since the y values are specific to each variable
 ```
 
 
-```{r GGally - line plot}
+```{r GGally - line plot, eval=FALSE}
 install.packages("GGally")
 library(GGally)
 
@@ -351,22 +458,199 @@ GGally::ggparcoord(
 # these plots are difficult to interpret as they are. Unfortunately, GGally doesn't support facet_wrap() by variable!
 ```
 
+Now we just need to play around with HDBSCAN/DBSCAN
 
-```{r UMAP with facet wrapping}
-library(ggplot2)
+```{r DBSCAN analysis}
+rX_break <- scale(d_right[, features2])
+lX_break <- scale(d_left[, features2])
 
-ggplot(r_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
-  geom_point(alpha = 0.7, size = 2) +
-  facet_wrap(~cluster) +
-  theme_minimal() +
-  labs(title = "UMAP Faceted by Cluster (RHP)")
+# run HDBSCAN with a sensible minPts (e.g., 20)
+hdb_r <- hdbscan(rX_break, minPts = 20)
 
-ggplot(l_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
-  geom_point(alpha = 0.7, size = 2) +
-  facet_wrap(~cluster) +
-  theme_minimal() +
-  labs(title = "UMAP Faceted by Cluster (LHP)")
+# add clusters back to original df
+d_right$hdb_cluster <- as.factor(hdb_r$cluster)
+cat("Unique clusters for RHP:", length(unique(hdb_r$cluster[hdb_r$cluster > 0])), "\n")
 
-# LHP is much easier to interpret than RHP!
+# run HDBSCAN with a sensible minPts (e.g., 20)
+hdb_l <- hdbscan(lX_break, minPts = 20)
+
+# add clusters back to original df
+d_left$hdb_cluster <- as.factor(hdb_l$cluster)
+cat("Unique clusters for LHP:", length(unique(hdb_l$cluster[hdb_l$cluster > 0])), "\n")
+```
+
+```{r visualise DBSCAN models with UMAP}
+set.seed(0312)
+
+# right
+r_umap_break <- umap(rX_break)
+
+r_umap_df_break <- data.frame(
+  UMAP1 = r_umap_break$layout[, 1],
+  UMAP2 = r_umap_break$layout[, 2],
+  cluster = d_right$hdb_cluster,
+  vb = d_right$vb,
+  hb = d_right$hb,
+  ivb = d_right$ivb,
+  TaggedPitchType = d_right$TaggedPitchType,
+  AutoPitchType = d_right$AutoPitchType
+)
+
+plot_hdb_rhp <- plot_ly(
+  r_umap_df_break,
+  x = ~UMAP1,
+  y = ~UMAP2,
+  type = 'scatter',
+  mode = 'markers',
+  color = ~cluster,
+  text = ~paste(
+    "Cluster:", cluster,
+    "<br>Tagged:", TaggedPitchType,
+    "<br>Auto:", AutoPitchType,
+    "<br>VB:", round(vb, 1),
+    "<br>HB:", round(hb, 1),
+    "<br>IVB:", round(ivb, 1)
+  ),
+  marker = list(size = 8, opacity = 0.8)
+) %>%
+  layout(
+    title = "RHP HDBSCAN Clustering (UMAP Projection)",
+    xaxis = list(title = "UMAP1"),
+    yaxis = list(title = "UMAP2"),
+    legend = list(title = list(text = "Cluster"))
+  )
+
+print(plot_hdb_rhp)
+
+# left
+l_umap_break <- umap(lX_break)
+
+l_umap_df_break <- data.frame(
+  UMAP1 = l_umap_break$layout[, 1],
+  UMAP2 = l_umap_break$layout[, 2],
+  cluster = d_left$hdb_cluster,
+  vb = d_left$vb,
+  hb = d_left$hb,
+  ivb = d_left$ivb,
+  TaggedPitchType = d_left$TaggedPitchType,
+  AutoPitchType = d_left$AutoPitchType
+)
+
+plot_hdb_lhp <- plot_ly(
+  l_umap_df_break,
+  x = ~UMAP1,
+  y = ~UMAP2,
+  type = 'scatter',
+  mode = 'markers',
+  color = ~cluster,
+  text = ~paste(
+    "Cluster:", cluster,
+    "<br>Tagged:", TaggedPitchType,
+    "<br>Auto:", AutoPitchType,
+    "<br>VB:", round(vb, 1),
+    "<br>HB:", round(hb, 1),
+    "<br>IVB:", round(ivb, 1)
+  ),
+  marker = list(size = 8, opacity = 0.8)
+) %>%
+  layout(
+    title = "LHP HDBSCAN Clustering (UMAP Projection)",
+    xaxis = list(title = "UMAP1"),
+    yaxis = list(title = "UMAP2"),
+    legend = list(title = list(text = "Cluster"))
+  )
+
+print(plot_hdb_lhp)
+
+htmlwidgets::saveWidget(
+  widget = plot_hdb_rhp,
+  file = "UMAP for RHP Break Profile (DBSCAN).html",
+  selfcontained = TRUE
+)
+
+htmlwidgets::saveWidget(
+  widget = plot_hdb_lhp,
+  file = "UMAP for LHP Break Profile (DBSCAN).html",
+  selfcontained = TRUE
+)
+
+```
+
+
+```{r summary data - DBSCAN}
+
+summary_stats_rhp <- d_right %>%
+  filter(hdb_cluster != 0) %>%  # exclude noise
+  group_by(hdb_cluster) %>%
+  summarise(across(all_of(features2), list(
+    median = ~median(., na.rm = TRUE),
+    Q1 = ~quantile(., 0.25, na.rm = TRUE),
+    Q3 = ~quantile(., 0.75, na.rm = TRUE),
+    IQR = ~IQR(., na.rm = TRUE)
+  ), .names = "{.col}_{.fn}")) %>%
+  ungroup()
+
+freq_summary_rhp_tagged <- d_right %>%
+  filter(hdb_cluster != 0) %>%
+  group_by(hdb_cluster, TaggedPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(hdb_cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(hdb_cluster, desc(n))
+
+freq_summary_rhp_auto <- d_right %>%
+  filter(hdb_cluster != 0) %>%
+  group_by(hdb_cluster, AutoPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(hdb_cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(hdb_cluster, desc(n))
+
+# save the summary data for RHP
+write.csv(summary_stats_rhp, file = "Data/RHP Cluster Summary (DBSCAN).csv", row.names = FALSE)
+
+# save the tagged cluster summary data for RHP
+write.csv(freq_summary_rhp_tagged, file = "Data/RHP Tagged Cluster Summary (DBSCAN).csv", row.names = FALSE)
+
+# save the auto cluster summary data for RHP
+write.csv(freq_summary_rhp_auto, file = "Data/RHP Auto Cluster Summary (DBSCAN).csv", row.names = FALSE)
+
+
+summary_stats_lhp <- d_left %>%
+  filter(hdb_cluster != 0) %>%  # exclude noise
+  group_by(hdb_cluster) %>%
+  summarise(across(all_of(features2), list(
+    median = ~median(., na.rm = TRUE),
+    Q1 = ~quantile(., 0.25, na.rm = TRUE),
+    Q3 = ~quantile(., 0.75, na.rm = TRUE),
+    IQR = ~IQR(., na.rm = TRUE)
+  ), .names = "{.col}_{.fn}")) %>%
+  ungroup()
+
+freq_summary_lhp_tagged <- d_left %>%
+  filter(hdb_cluster != 0) %>%
+  group_by(hdb_cluster, TaggedPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(hdb_cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(hdb_cluster, desc(n))
+
+freq_summary_lhp_auto <- d_left %>%
+  filter(hdb_cluster != 0) %>%
+  group_by(hdb_cluster, AutoPitchType) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(hdb_cluster) %>%
+  mutate(percent = round(n / sum(n) * 100, 1)) %>%
+  arrange(hdb_cluster, desc(n))
+
+# save the summary data for LHP
+write.csv(summary_stats_lhp, file = "Data/LHP Cluster Summary (DBSCAN).csv", row.names = FALSE)
+
+# save the tagged cluster summary data for LHP
+write.csv(freq_summary_lhp_tagged, file = "Data/LHP Tagged Cluster Summary (DBSCAN).csv", row.names = FALSE)
+
+# save the auto cluster summary data for LHP
+write.csv(freq_summary_lhp_auto, file = "Data/LHP Auto Cluster Summary (DBSCAN).csv", row.names = FALSE)
+
 ```
 
