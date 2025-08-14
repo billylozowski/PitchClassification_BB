@@ -116,7 +116,7 @@ rX <- scale(d_right[, features2]) # scale features
 gmm_modelr <- Mclust(rX)
 best_kr <- gmm_modelr$G
 d_right$cluster <- as.factor(gmm_modelr$classification)
-cat("Optimal number of clusters for RHP based on break profile:", best_kr, "\n")
+cat("Optimal number of clusters for RHP based on break profile (GMM):", best_kr, "\n")
 
 # UMAP for dimensionality reduction
 # Uniform Manifold Approximation and Projection
@@ -149,11 +149,11 @@ plot_rhp <- plot_ly(
   colors = hue_pal()(best_kr),
   text = ~paste(
     "Cluster:", cluster,
-    "<br>Tagged:", TaggedPitchType,
+    "<br>Manual:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>Induced VB (deg):", round(inducedVB, 2),
-    "<br>VB (deg):", round(VB, 2),
-    "<br>HB (deg):", round(HB, 2)
+    "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
+    "<br>VB:", paste0(round(VB, 2), "m"),
+    "<br>HB:", paste0(round(HB, 2), "m")
     # "<br>Velocity (m.s):", round(velocity, 1),
     # "<br>Spin Rate (deg/s):", round(spin_rate, 0),
     # "<br>Spin Axis (deg):", round(spin_axis, 0)
@@ -176,7 +176,7 @@ lX <- scale(d_left[, features2])  # scale features
 gmm_modell <- Mclust(lX)
 best_kl <- gmm_modell$G
 d_left$cluster <- as.factor(gmm_modell$classification)
-cat("Optimal number of clusters for LHP based on break profile:", best_kl, "\n")
+cat("Optimal number of clusters for LHP based on break profile (GMM):", best_kl, "\n")
 
 # UMAP for dimensionality reduction
 # Uniform Manifold Approximation and Projection
@@ -209,11 +209,11 @@ plot_lhp <- plot_ly(
   colors = hue_pal()(best_kl),
   text = ~paste(
     "Cluster:", cluster,
-    "<br>Tagged:", TaggedPitchType,
+    "<br>Manual:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>Induced VB (deg):", round(inducedVB, 2),
-    "<br>VB (deg):", round(VB, 2),
-    "<br>HB (deg):", round(HB, 2)
+    "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
+    "<br>VB:", paste0(round(VB, 2), "m"),
+    "<br>HB:", paste0(round(HB, 2), "m")
     # "<br>Velocity (m.s):", round(velocity, 1),
     # "<br>Spin Rate (deg/s):", round(spin_rate, 0),
     # "<br>Spin Axis (deg):", round(spin_axis, 0)
@@ -235,13 +235,13 @@ print(plot_lhp)
 
 htmlwidgets::saveWidget(
   widget = plot_rhp,
-  file = "UMAP for RHP Break Profile.html",
+  file = "UMAP for RHP Break Profile (GMM).html",
   selfcontained = TRUE
 )
 
 htmlwidgets::saveWidget(
   widget = plot_lhp,
-  file = "UMAP for LHP Break Profile.html",
+  file = "UMAP for LHP Break Profile (GMM).html",
   selfcontained = TRUE
 )
 
@@ -264,8 +264,8 @@ UMAP_lhp <- ggplot(l_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(title = "UMAP Faceted by Cluster (LHP)")
 
-ggsave(UMAP_rhp, file = "UMAP Faceted by Cluster - RHP.png", dpi = 600)
-ggsave(UMAP_lhp, file = "UMAP Faceted by Cluster - LHP.png", dpi = 600)
+ggsave(UMAP_rhp, file = "UMAP Faceted by Cluster - RHP (GMM).png", dpi = 600)
+ggsave(UMAP_lhp, file = "UMAP Faceted by Cluster - LHP (GMM).png", dpi = 600)
 
 # these plots allow us to separate the UMAP into the individual clusters
 ```
@@ -278,13 +278,13 @@ cluster_summary_rhp <- d_right %>%
   summarise(across(all_of(features), list(
     Q1 = ~quantile(.x, 0.25, na.rm = TRUE),
     Q3 = ~quantile(.x, 0.75, na.rm = TRUE),
-    median = ~median(.x, na.rm = TRUE),
+    mean = ~mean(.x, na.rm = TRUE),
     IQR = ~IQR(.x, na.rm = TRUE)
   ), .names = "{.col}_{.fn}")) %>%
   ungroup()
 
 # save the summary data for RHP
-write.csv(cluster_summary_rhp, file = "Data/RHP Cluster Summary.csv", row.names = FALSE)
+write.csv(cluster_summary_rhp, file = "Data/RHP Ball Metric Summary (by cluster - GMM).csv", row.names = FALSE)
 
 # LHP
 cluster_summary_lhp <- d_left %>%
@@ -292,13 +292,13 @@ cluster_summary_lhp <- d_left %>%
   summarise(across(all_of(features), list(
     Q1 = ~quantile(.x, 0.25, na.rm = TRUE),
     Q3 = ~quantile(.x, 0.75, na.rm = TRUE),
-    median = ~median(.x, na.rm = TRUE),
+    mean = ~mean(.x, na.rm = TRUE),
     IQR = ~IQR(.x, na.rm = TRUE)
   ), .names = "{.col}_{.fn}")) %>%
   ungroup()
 
 # save the summary data for LHP
-write.csv(cluster_summary_lhp, file = "Data/LHP Cluster Summary.csv", row.names = FALSE)
+write.csv(cluster_summary_lhp, file = "Data/LHP Ball Metric Summary (by cluster - GMM).csv", row.names = FALSE)
 ```
 
 
@@ -311,7 +311,7 @@ pitchtype_summary_rhp_auto <- d_right %>%
   arrange(cluster, desc(n))
 
 # save the auto tagged cluster summary data for RHP
-write.csv(pitchtype_summary_rhp_auto, file = "Data/RHP Auto Tagged Cluster Summary.csv", row.names = FALSE)
+write.csv(pitchtype_summary_rhp_auto, file = "Data/RHP Pitch Frequency by Cluster (auto-tagged - GMM).csv", row.names = FALSE)
 
 pitchtype_summary_rhp_tagged <- d_right %>%
   group_by(cluster, TaggedPitchType) %>%
@@ -321,7 +321,7 @@ pitchtype_summary_rhp_tagged <- d_right %>%
   arrange(cluster, desc(n))
 
 # save the tagged cluster summary data for RHP
-write.csv(pitchtype_summary_rhp_tagged, file = "Data/RHP Tagged Cluster Summary.csv", row.names = FALSE)
+write.csv(pitchtype_summary_rhp_tagged, file = "Data/RHP Pitch Frequency by Cluster (manually tagged - GMM).csv", row.names = FALSE)
 
 pitchtype_summary_lhp_auto <- d_left %>%
   group_by(cluster, AutoPitchType) %>%
@@ -331,7 +331,7 @@ pitchtype_summary_lhp_auto <- d_left %>%
   arrange(cluster, desc(n))
 
 # save the auto tagged cluster summary data for RHP
-write.csv(pitchtype_summary_lhp_auto, file = "Data/LHP Auto Tagged Cluster Summary.csv", row.names = FALSE)
+write.csv(pitchtype_summary_lhp_auto, file = "Data/LHP Pitch Frequency by Cluster (auto-tagged - GMM).csv", row.names = FALSE)
 
 pitchtype_summary_lhp_tagged <- d_left %>%
   group_by(cluster, TaggedPitchType) %>%
@@ -341,7 +341,7 @@ pitchtype_summary_lhp_tagged <- d_left %>%
   arrange(cluster, desc(n))
 
 # save the tagged cluster summary data for RHP
-write.csv(pitchtype_summary_lhp_tagged, file = "Data/LHP Tagged Cluster Summary.csv", row.names = FALSE)
+write.csv(pitchtype_summary_lhp_tagged, file = "Data/LHP Pitch Frequency by Cluster (manually tagged - GMM).csv", row.names = FALSE)
 ```
 
 Visualise each cluster's ball metrics for LHP
@@ -374,6 +374,7 @@ ggplot(cluster_l, aes(x = variable, y = value, fill = cluster)) +
 
 # these plots are a little conjested, so we'll use facet_wrap() to panel them into single variables
 ```
+
 
 ```{r cluster box plots with purrr}
 install.packages("purrr")
@@ -469,14 +470,14 @@ hdb_r <- hdbscan(rX_break, minPts = 20)
 
 # add clusters back to original df
 d_right$hdb_cluster <- as.factor(hdb_r$cluster)
-cat("Unique clusters for RHP:", length(unique(hdb_r$cluster[hdb_r$cluster > 0])), "\n")
+cat("Optimal number of clusters for RHP based on break profile (DBSCAN):", length(unique(hdb_r$cluster[hdb_r$cluster > 0])), "\n")
 
 # run HDBSCAN with a sensible minPts (e.g., 20)
 hdb_l <- hdbscan(lX_break, minPts = 20)
 
 # add clusters back to original df
 d_left$hdb_cluster <- as.factor(hdb_l$cluster)
-cat("Unique clusters for LHP:", length(unique(hdb_l$cluster[hdb_l$cluster > 0])), "\n")
+cat("Optimal number of clusters for LHP based on break profile (DBSCAN):", length(unique(hdb_l$cluster[hdb_l$cluster > 0])), "\n")
 ```
 
 ```{r visualise DBSCAN models with UMAP}
@@ -505,11 +506,11 @@ plot_hdb_rhp <- plot_ly(
   color = ~cluster,
   text = ~paste(
     "Cluster:", cluster,
-    "<br>Tagged:", TaggedPitchType,
+    "<br>Manual:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>VB:", round(vb, 1),
-    "<br>HB:", round(hb, 1),
-    "<br>IVB:", round(ivb, 1)
+    "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
+    "<br>VB:", paste0(round(VB, 2), "m"),
+    "<br>HB:", paste0(round(HB, 2), "m")
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -547,9 +548,9 @@ plot_hdb_lhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Tagged:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
-    "<br>VB:", round(vb, 1),
-    "<br>HB:", round(hb, 1),
-    "<br>IVB:", round(ivb, 1)
+    "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
+    "<br>VB:", paste0(round(VB, 2), "m"),
+    "<br>HB:", paste0(round(HB, 2), "m")
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -582,8 +583,8 @@ htmlwidgets::saveWidget(
 summary_stats_rhp <- d_right %>%
   filter(hdb_cluster != 0) %>%  # exclude noise
   group_by(hdb_cluster) %>%
-  summarise(across(all_of(features2), list(
-    median = ~median(., na.rm = TRUE),
+  summarise(across(all_of(features), list(
+    mean = ~mean(., na.rm = TRUE),
     Q1 = ~quantile(., 0.25, na.rm = TRUE),
     Q3 = ~quantile(., 0.75, na.rm = TRUE),
     IQR = ~IQR(., na.rm = TRUE)
@@ -607,20 +608,20 @@ freq_summary_rhp_auto <- d_right %>%
   arrange(hdb_cluster, desc(n))
 
 # save the summary data for RHP
-write.csv(summary_stats_rhp, file = "Data/RHP Cluster Summary (DBSCAN).csv", row.names = FALSE)
+write.csv(summary_stats_rhp, file = "Data/RHP Ball Metric Summary (by cluster - DBSCAN).csv", row.names = FALSE)
 
 # save the tagged cluster summary data for RHP
-write.csv(freq_summary_rhp_tagged, file = "Data/RHP Tagged Cluster Summary (DBSCAN).csv", row.names = FALSE)
+write.csv(freq_summary_rhp_tagged, file = "Data/RHP Pitch Frequency by Cluster (manually tagged - DBSCAN).csv", row.names = FALSE)
 
 # save the auto cluster summary data for RHP
-write.csv(freq_summary_rhp_auto, file = "Data/RHP Auto Cluster Summary (DBSCAN).csv", row.names = FALSE)
+write.csv(freq_summary_rhp_auto, file = "Data/RHP Pitch Frequency by Cluster (auto tagged - DBSCAN).csv", row.names = FALSE)
 
 
 summary_stats_lhp <- d_left %>%
   filter(hdb_cluster != 0) %>%  # exclude noise
   group_by(hdb_cluster) %>%
-  summarise(across(all_of(features2), list(
-    median = ~median(., na.rm = TRUE),
+  summarise(across(all_of(features), list(
+    mean = ~mean(., na.rm = TRUE),
     Q1 = ~quantile(., 0.25, na.rm = TRUE),
     Q3 = ~quantile(., 0.75, na.rm = TRUE),
     IQR = ~IQR(., na.rm = TRUE)
@@ -644,13 +645,13 @@ freq_summary_lhp_auto <- d_left %>%
   arrange(hdb_cluster, desc(n))
 
 # save the summary data for LHP
-write.csv(summary_stats_lhp, file = "Data/LHP Cluster Summary (DBSCAN).csv", row.names = FALSE)
+write.csv(summary_stats_lhp, file = "Data/LHP Ball Metric Summary (by cluster - DBSCAN).csv", row.names = FALSE)
 
 # save the tagged cluster summary data for LHP
-write.csv(freq_summary_lhp_tagged, file = "Data/LHP Tagged Cluster Summary (DBSCAN).csv", row.names = FALSE)
+write.csv(freq_summary_lhp_tagged, file = "Data/LHP Pitch Frequency by Cluster (manually tagged - DBSCAN).csv", row.names = FALSE)
 
 # save the auto cluster summary data for LHP
-write.csv(freq_summary_lhp_auto, file = "Data/LHP Auto Cluster Summary (DBSCAN).csv", row.names = FALSE)
+write.csv(freq_summary_lhp_auto, file = "Data/LHP Pitch Frequency by Cluster (auto tagged - DBSCAN).csv", row.names = FALSE)
 
 ```
 
