@@ -17,7 +17,7 @@ HDBSCAN is a variant of DBSCAN (Density-Based Spatial Clustering) that does not 
 
 All figures/plots can be found on GitHub [here](https://github.com/billylozowski/PitchClassification_BB/tree/main/Figures). HTML widgets (interactive plots) can be accessed at the following URLs:
 
-[1. UMAP for RHP Break Profile (GMM)](file:///C:/Users/37784478/OneDrive%20-%20University%20of%20Nebraska/Documents/UNO%20Projects/PitchClassification_BB/Figures/UMAP%20for%20RHP%20Break%20Profile%20(GMM).html)
-[2. UMAP for LHP Break Profile (GMM)](file:///C:/Users/37784478/OneDrive%20-%20University%20of%20Nebraska/Documents/UNO%20Projects/PitchClassification_BB/Figures/UMAP%20for%20LHP%20Break%20Profile%20(GMM).html)
-[3. UMAP for RHP Break Profile (DBSCAN)](file:///C:/Users/37784478/OneDrive%20-%20University%20of%20Nebraska/Documents/UNO%20Projects/PitchClassification_BB/Figures/UMAP%20for%20RHP%20Break%20Profile%20(DBSCAN).html)
-[4. UMAP for LHP Break Profile (DBSCAN)](file:///C:/Users/37784478/OneDrive%20-%20University%20of%20Nebraska/Documents/UNO%20Projects/PitchClassification_BB/Figures/UMAP%20for%20LHP%20Break%20Profile%20(DBSCAN).html)
+[1. UMAP for RHP Break Profile (GMM)](https://uofnebraska-my.sharepoint.com/:u:/g/personal/37784478_nebraska_edu/ET6k2jo1tklAkD19F6yHrugBgj_I7C-veqIFWPmF0kCcUA?e=iiNzQh)
+[2. UMAP for LHP Break Profile (GMM)](https://uofnebraska-my.sharepoint.com/:u:/g/personal/37784478_nebraska_edu/Ee2lLfyeHuJAhFx3DjMWIBQBCvWFcHuctuAR68kIJpT6JA?e=zFjvk0)
+[3. UMAP for RHP Break Profile (DBSCAN)](https://uofnebraska-my.sharepoint.com/:u:/g/personal/37784478_nebraska_edu/EdLczmKGM-ZJoBMNeLdC4p4BwKaXRVJCnlyZqBARWA_ylw?e=9q1T6v)
+[4. UMAP for LHP Break Profile (DBSCAN)](https://uofnebraska-my.sharepoint.com/:u:/g/personal/37784478_nebraska_edu/EVwRLqxv9AFPkp0SI-DTn_MBGljNpWR6e9W2NPYTO17Zrw?e=1fAMeC)
