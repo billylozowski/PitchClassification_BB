@@ -128,12 +128,17 @@ r_umap_df <- data.frame(
   UMAP1 = r_umap_result$layout[, 1],
   UMAP2 = r_umap_result$layout[, 2],
   cluster = d_right$cluster,
-  inducedVB = d_right$ivb,
+  velocity = d_right$velocity,
+  vertical_release_angle = d_right$vertical_release_angle,
+  horizontal_release_angle = d_right$horizontal_release_angle,
+  spin_rate = d_right$spin_rate,
+  spin_axis = d_right$spin_axis,
+  release_height = d_right$release_height,
+  release_side = d_right$release_side,
+  extension = d_right$extension,
   VB = d_right$vb,
-  HB = d_right$hb,
-  # velocity = d_right$velocity,
-  # spin_rate = d_right$spin_rate,
-  # spin_axis = d_right$spin_axis,
+  inducedVB = d_right$ivb,
+  HB = d_right$hb,  
   TaggedPitchType = d_right$TaggedPitchType,
   AutoPitchType = d_right$AutoPitchType
 )
@@ -151,12 +156,19 @@ plot_rhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Manual:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
+    
+    "<br>Velocity:", paste0(round(velocity, 1), "m/s"),
+    "<br>Vertical Angle:", paste0(round(vertical_release_angle, 1), "deg"),
+    "<br>Horizontal Angle:", paste0(round(horizontal_release_angle, 1), "deg"),
+    "<br>Spin Rate:", paste0(round(spin_rate, 0), "rpm"),
+    "<br>Spin Axis:", paste0(round(spin_axis, 1), "deg"),
+    "<br>Release Height:", paste0(round(release_height, 2), "m"),
+    "<br>Release Side:", paste0(round(release_side, 2), "m"),
+    "<br>Release Extension:", paste0(round(extension, 2), "m"),
+    
     "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
     "<br>VB:", paste0(round(VB, 2), "m"),
     "<br>HB:", paste0(round(HB, 2), "m")
-    # "<br>Velocity (m.s):", round(velocity, 1),
-    # "<br>Spin Rate (deg/s):", round(spin_rate, 0),
-    # "<br>Spin Axis (deg):", round(spin_axis, 0)
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -188,12 +200,17 @@ l_umap_df <- data.frame(
   UMAP1 = l_umap_result$layout[, 1],
   UMAP2 = l_umap_result$layout[, 2],
   cluster = d_left$cluster,
-  inducedVB = d_left$ivb,
+  velocity = d_left$velocity,
+  vertical_release_angle = d_left$vertical_release_angle,
+  horizontal_release_angle = d_left$horizontal_release_angle,
+  spin_rate = d_left$spin_rate,
+  spin_axis = d_left$spin_axis,
+  release_height = d_left$release_height,
+  release_side = d_left$release_side,
+  extension = d_left$extension,
   VB = d_left$vb,
-  HB = d_left$hb,
-  # velocity = d_left$velocity,
-  # spin_rate = d_left$spin_rate,
-  # spin_axis = d_left$spin_axis,
+  inducedVB = d_left$ivb,
+  HB = d_left$hb,  
   TaggedPitchType = d_left$TaggedPitchType,
   AutoPitchType = d_left$AutoPitchType
 )
@@ -211,12 +228,19 @@ plot_lhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Manual:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
+    
+    "<br>Velocity:", paste0(round(velocity, 1), "m/s"),
+    "<br>Vertical Angle:", paste0(round(vertical_release_angle, 1), "deg"),
+    "<br>Horizontal Angle:", paste0(round(horizontal_release_angle, 1), "deg"),
+    "<br>Spin Rate:", paste0(round(spin_rate, 0), "rpm"),
+    "<br>Spin Axis:", paste0(round(spin_axis, 1), "deg"),
+    "<br>Release Height:", paste0(round(release_height, 2), "m"),
+    "<br>Release Side:", paste0(round(release_side, 2), "m"),
+    "<br>Release Extension:", paste0(round(extension, 2), "m"),
+    
     "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
     "<br>VB:", paste0(round(VB, 2), "m"),
     "<br>HB:", paste0(round(HB, 2), "m")
-    # "<br>Velocity (m.s):", round(velocity, 1),
-    # "<br>Spin Rate (deg/s):", round(spin_rate, 0),
-    # "<br>Spin Axis (deg):", round(spin_axis, 0)
   ),
   marker = list(size = 8, opacity = 0.8)
 ) %>%
@@ -490,9 +514,17 @@ r_umap_df_break <- data.frame(
   UMAP1 = r_umap_break$layout[, 1],
   UMAP2 = r_umap_break$layout[, 2],
   cluster = d_right$hdb_cluster,
-  vb = d_right$vb,
-  hb = d_right$hb,
-  ivb = d_right$ivb,
+  velocity = d_right$velocity,
+  vertical_release_angle = d_right$vertical_release_angle,
+  horizontal_release_angle = d_right$horizontal_release_angle,
+  spin_rate = d_right$spin_rate,
+  spin_axis = d_right$spin_axis,
+  release_height = d_right$release_height,
+  release_side = d_right$release_side,
+  extension = d_right$extension,
+  VB = d_right$vb,
+  inducedVB = d_right$ivb,
+  HB = d_right$hb,  
   TaggedPitchType = d_right$TaggedPitchType,
   AutoPitchType = d_right$AutoPitchType
 )
@@ -508,6 +540,16 @@ plot_hdb_rhp <- plot_ly(
     "Cluster:", cluster,
     "<br>Manual:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
+    
+    "<br>Velocity:", paste0(round(velocity, 1), "m/s"),
+    "<br>Vertical Angle:", paste0(round(vertical_release_angle, 1), "deg"),
+    "<br>Horizontal Angle:", paste0(round(horizontal_release_angle, 1), "deg"),
+    "<br>Spin Rate:", paste0(round(spin_rate, 0), "rpm"),
+    "<br>Spin Axis:", paste0(round(spin_axis, 1), "deg"),
+    "<br>Release Height:", paste0(round(release_height, 2), "m"),
+    "<br>Release Side:", paste0(round(release_side, 2), "m"),
+    "<br>Release Extension:", paste0(round(extension, 2), "m"),
+    
     "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
     "<br>VB:", paste0(round(VB, 2), "m"),
     "<br>HB:", paste0(round(HB, 2), "m")
@@ -530,9 +572,17 @@ l_umap_df_break <- data.frame(
   UMAP1 = l_umap_break$layout[, 1],
   UMAP2 = l_umap_break$layout[, 2],
   cluster = d_left$hdb_cluster,
-  vb = d_left$vb,
-  hb = d_left$hb,
-  ivb = d_left$ivb,
+  velocity = d_left$velocity,
+  vertical_release_angle = d_left$vertical_release_angle,
+  horizontal_release_angle = d_left$horizontal_release_angle,
+  spin_rate = d_left$spin_rate,
+  spin_axis = d_left$spin_axis,
+  release_height = d_left$release_height,
+  release_side = d_left$release_side,
+  extension = d_left$extension,
+  VB = d_left$vb,
+  inducedVB = d_left$ivb,
+  HB = d_left$hb,  
   TaggedPitchType = d_left$TaggedPitchType,
   AutoPitchType = d_left$AutoPitchType
 )
@@ -546,8 +596,18 @@ plot_hdb_lhp <- plot_ly(
   color = ~cluster,
   text = ~paste(
     "Cluster:", cluster,
-    "<br>Tagged:", TaggedPitchType,
+    "<br>Manual:", TaggedPitchType,
     "<br>Auto:", AutoPitchType,
+    
+    "<br>Velocity:", paste0(round(velocity, 1), "m/s"),
+    "<br>Vertical Angle:", paste0(round(vertical_release_angle, 1), "deg"),
+    "<br>Horizontal Angle:", paste0(round(horizontal_release_angle, 1), "deg"),
+    "<br>Spin Rate:", paste0(round(spin_rate, 0), "rpm"),
+    "<br>Spin Axis:", paste0(round(spin_axis, 1), "deg"),
+    "<br>Release Height:", paste0(round(release_height, 2), "m"),
+    "<br>Release Side:", paste0(round(release_side, 2), "m"),
+    "<br>Release Extension:", paste0(round(extension, 2), "m"),
+    
     "<br>Induced VB:", paste0(round(inducedVB, 2), "m"),
     "<br>VB:", paste0(round(VB, 2), "m"),
     "<br>HB:", paste0(round(HB, 2), "m")
