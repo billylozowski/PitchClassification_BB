@@ -1,3 +1,16 @@
+---
+title: "Pitch Classification by Cluster Analysis"
+author: "Billy Lozowski"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+  html_document:   # specify output document type
+    toc: true      # include a table of contents
+  md_document:     # render as a markdown file
+    variant: gfm   # specify that you want to save the output as a markdown file for github
+---
+
+
 The purpose of this markdown script is to see if we can determine an objective number of pitch types thrown by baseball pitchers. To do this, we'll use in-game Trackman data, along with a few different analysis techniques.
 
 Analyses:
@@ -28,17 +41,20 @@ Benefits:
 
 If the packages below need to be installed, removed the "eval=FALSE" from the curly brackets
 ```{r install packages if required, eval=FALSE}
-install.packages(c("mclust", "umap", "plotly", "scales", "tidyverse", "dbscan"))
+install.packages(c("mclust", "umap", "plotly", "scales", "tidyverse", "dbscan", "proxy", "pheatmap", "RColorBrewer"))
 ```
 
 First, let's load the packages we need to perform this analysis
 ```{r load packages, message=FALSE}
-library(mclust)
-library(umap)
-library(plotly)
-library(scales)
+library(mclust)       # GMM analysis
+library(umap)         # visualising cluster models
+library(plotly)       # interactive model plots
+library(scales)       # scale variables
 library(tidyverse)
-library(dbscan)
+library(dbscan)       # DBSCAN analysis
+library(proxy)        # similarity matrices
+library(pheatmap)     # heatmap for similarity matrix
+library(RColorBrewer) # colour scale for heatmaps
 ```
 
 Now let's read in the data
@@ -712,6 +728,63 @@ write.csv(freq_summary_lhp_tagged, file = "Data/LHP Pitch Frequency by Cluster (
 
 # save the auto cluster summary data for LHP
 write.csv(freq_summary_lhp_auto, file = "Data/LHP Pitch Frequency by Cluster (auto tagged - DBSCAN).csv", row.names = FALSE)
+
+```
+
+
+Some of the clusters identified in both the GMM and HDBSCAN analyses seem to overlap, or don't necessarily look that different from each other. We are, therefore, going to create a quick similarity matrix to assess which clusters look most similar to each other (using Euclidean distance).
+
+$$
+\text{Distance} = \sqrt{(x_1 - x_2)^2 + (y_1 - y_2)^2 + \dots + (n_1 - n_2)^2}
+$$
+
+```{r similarity matrix}
+
+RHP_summary <- read.csv("Data/RHP Ball Metric Summary (by cluster - GMM).csv")
+LHP_summary <- read.csv("Data/LHP Ball Metric Summary (by cluster - GMM).csv")
+
+# select only mean columns
+RHP_mean_cols <- names(RHP_summary)[grepl("_mean$", names(RHP_summary))]
+LHP_mean_cols <- names(LHP_summary)[grepl("_mean$", names(LHP_summary))]
+
+# extract mean data per cluster
+RHP_cluster_means <- RHP_summary %>%
+  select(cluster, all_of(RHP_mean_cols)) %>%
+  column_to_rownames("cluster")  # use cluster number as row names
+
+LHP_cluster_means <- LHP_summary %>%
+  select(cluster, all_of(LHP_mean_cols)) %>%
+  column_to_rownames("cluster")
+
+# calculate pairwise Euclidean distances
+RHP_similarity_matrix <- as.matrix(round(dist(RHP_cluster_means, method = "euclidean")), 0)
+LHP_similarity_matrix <- as.matrix(round(dist(LHP_cluster_means, method = "euclidean")), 0)
+
+# matrix heatmaps
+png("Figures/RHP Cluster Similarity Matrix (Euclidean Distance).png", width = 6, height = 6, units = "in", res = 600)
+
+pheatmap(RHP_similarity_matrix,
+         display_numbers = TRUE,
+         number_format = "%.0f",
+         main = "RHP Cluster Similarity Matrix (Euclidean Distance)",
+         fontsize_number = 10,
+         color = colorRampPalette(brewer.pal(9, "YlGnBu"))(100))
+
+dev.off()
+
+png("Figures/LHP Cluster Similarity Matrix (Euclidean Distance).png", width = 6, height = 6, units = "in", res = 600)
+
+pheatmap(LHP_similarity_matrix,
+         display_numbers = TRUE,
+         number_format = "%.0f",
+         main = "LHP Cluster Similarity Matrix (Euclidean Distance)",
+         fontsize_number = 10,
+         color = colorRampPalette(brewer.pal(9, "YlGnBu"))(100))
+
+dev.off()
+
+write.csv(RHP_similarity_matrix, "RHP Cluster Similarity Matrix.csv")
+write.csv(LHP_similarity_matrix, "LHP Cluster Similarity Matrix.csv")
 
 ```
 
