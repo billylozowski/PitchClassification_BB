@@ -17,4 +17,4 @@ HDBSCAN is a variant of DBSCAN (Density-Based Spatial Clustering) that does not 
 
 All figures/plots can be found on GitHub [here](https://github.com/billylozowski/PitchClassification_BB/tree/main/Figures). HTML widgets (interactive plots) can be accessed at the following URL:
 
-[Clustering HTML Widgets](https://app.netlify.com/projects/glowing-donut-55ea66/deploys/689e36933418aa0868aeb1f3)
+[Clustering HTML Widgets](https://app.netlify.com/projects/pitchclassification-bb/deploys/689e36933418aa0868aeb1f3)
