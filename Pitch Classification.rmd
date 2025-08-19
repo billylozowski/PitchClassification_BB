@@ -3,9 +3,9 @@ title: "Pitch Classification by Cluster Analysis"
 author: "Billy Lozowski"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
   html_document:   # specify output document type
     toc: true      # include a table of contents
+  pdf_document:
   md_document:     # render as a markdown file
     variant: gfm   # specify that you want to save the output as a markdown file for github
 ---
@@ -13,13 +13,14 @@ output:
 
 The purpose of this markdown script is to see if we can determine an objective number of pitch types thrown by baseball pitchers. To do this, we'll use in-game Trackman data, along with a few different analysis techniques.
 
-Analyses:
-1. Gaussian Mixture Models (GMM)
+Analyses:  
+
+1. Gaussian Mixture Models (GMM)  
 __GMM assumes data is generated from a mixture of several Gaussian distributions, allowing for soft clustering (probabilistic assignment) and elliptical cluster shapes. This is particularly good when pitch types overlap (e.g., cutters vs. fastballs).__
 
   Use case: Model uncertainty in pitch classifications; helpful when pitches transition fluidly between types.
   
-2. HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise)
+2. HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise)  
 __This is a variant of DBSCAN (Density-Based Spatial Clustering) that does not require k, and handles varying densities well.__
 
 Very good for identifying:
@@ -40,30 +41,43 @@ Benefits:
 
 
 If the packages below need to be installed, removed the "eval=FALSE" from the curly brackets
-```{r install packages if required, eval=FALSE}
-install.packages(c("mclust", "umap", "plotly", "scales", "tidyverse", "dbscan", "proxy", "pheatmap", "RColorBrewer"))
-```
+```{r install and load required packages, include=FALSE}
 
-First, let's load the packages we need to perform this analysis
-```{r load packages, message=FALSE}
-library(mclust)       # GMM analysis
-library(umap)         # visualising cluster models
-library(plotly)       # interactive model plots
-library(scales)       # scale variables
-library(tidyverse)
-library(dbscan)       # DBSCAN analysis
-library(proxy)        # similarity matrices
-library(pheatmap)     # heatmap for similarity matrix
-library(RColorBrewer) # colour scale for heatmaps
+# list packages needed for this analysis
+packages <- c("mclust", "umap", "plotly", "scales", "tidyverse", "purrr", "dbscan", "proxy", "pheatmap", "RColorBrewer")
+
+# install only the ones that aren't already installed
+installed <- packages %in% rownames(installed.packages())
+if (any(!installed)) {
+  install.packages(packages[!installed])
+}
+
+# load the packages
+invisible(lapply(packages, library, character.only = TRUE))
+
+## "mclust" - GMM analysis
+## "umap" - visualising cluster models
+## "plotly" - interactive model plots
+## "scales" - scale variables
+## "tidyverse" - 
+## "purrr" - for boxplots
+## "dbscan" - DBSCAN analysis
+## "proxy" - similarity matrices
+## "pheatmap" - heatmap for similarity matrix
+## "RColorBrewer" - colour scale for heatmaps
+
 ```
 
 Now let's read in the data
-```{r load data}
+```{r load data, include=FALSE}
+
 d <- read.csv("Data/master_TrackMan_2025.csv")
+
 ```
 
 Having seen no difference in the number of identified pitch clusters when running this analysis with both release characteristics, and break profiles separately, the decision was made to use break profiles exclusively. This was largely down to the fact that this approach allowed for a more interpretable visualisation of each model (something that release parameters struggled with).
-```{r rename columns of interest}
+```{r rename columns of interest, include=FALSE}
+
 names(d)[names(d) == "RelSpeed"] <- "velocity"
 names(d)[names(d) == "VertRelAngle"] <- "vertical_release_angle"
 names(d)[names(d) == "HorzRelAngle"] <- "horizontal_release_angle"
@@ -75,10 +89,12 @@ names(d)[names(d) == "Extension"] <- "extension"
 names(d)[names(d) == "InducedVertBreak"] <- "ivb"
 names(d)[names(d) == "VertBreak"] <- "vb"
 names(d)[names(d) == "HorzBreak"] <- "hb"
+
 ```
 
 Some of the columns we will be using are currently not in metric. We, therefore, need to convert these before proceeding.
-```{r metric conversion}
+```{r metric conversion, include=FALSE}
+
 d$velocity <- d$velocity * 0.44704
 d$release_height <- d$release_height * 0.3048
 d$release_side <- d$release_side * 0.3048
@@ -86,10 +102,13 @@ d$extension <- d$extension * 0.3048
 d$ivb <- d$ivb * 0.0254
 d$vb <- d$vb * 0.0254
 d$hb <- d$hb * 0.0254
+
 ```
 
 To better help the analysis of this data, we are going to separate out right- and left-handers. This is owing to **"horizontal_release_angle"**, **"spin_axis"**, and **"release_side"** being different for each group (the values are essentially flipped for left-handed throwers). We're also going to remove any rows where missing values are.
-```{r split data}
+
+```{r split data, include=FALSE}
+
 d_right <- d %>%
   filter(PitcherThrows == "Right") %>%
   select(20:21, 29:33, 35:40)
@@ -101,10 +120,13 @@ d_left <-d %>%
   select(20:21, 29:33, 35:40)
 
 d_left <- d_left[complete.cases(d_left), ]   # remove any rows where metrics might be missing
+
 ```
 
 Identify the features (ball metrics) that we're interested in.
-```{r features - release parameters}
+```{r features, include=FALSE}
+
+# release parameters
 features <- c("velocity", 
               "vertical_release_angle", 
               "horizontal_release_angle", 
@@ -116,17 +138,18 @@ features <- c("velocity",
               "vb",
               "ivb",
               "hb")
-```
 
-```{r features - break profile}
+# break profile
 features2 <- c("vb",
                "ivb",
                "hb")
+
 ```
 
 
-```{r right handed pitchers}
-rX <- scale(d_right[, features2]) # scale features
+```{r right handed pitchers, echo=FALSE}
+
+rX <- scale(d_right[, features2]) # scale features (break profile only)
 
 # fit Gaussian Mixture Model (GMM)
 gmm_modelr <- Mclust(rX)
@@ -194,10 +217,12 @@ plot_rhp <- plot_ly(
     yaxis = list(title = "UMAP2"),
     legend = list(title = list(text = "Cluster"))
   )
+
 ```
 
 
-```{r left handed pitchers}
+```{r left handed pitchers, echo=FALSE}
+
 lX <- scale(d_left[, features2])  # scale features
 
 # fit Gaussian Mixture Model (GMM)
@@ -266,30 +291,39 @@ plot_lhp <- plot_ly(
     yaxis = list(title = "UMAP2"),
     legend = list(title = list(text = "Cluster"))
   )
+
 ```
 
-View Cluster plots
-```{r UMAP plots}
+View cluster plots
+```{r UMAP plots, echo=FALSE, warning=FALSE, message=FALSE}
+
+# display the interactive plots below
 print(plot_rhp)
 print(plot_lhp)
 
 htmlwidgets::saveWidget(
   widget = plot_rhp,
-  file = "UMAP for RHP Break Profile (GMM).html",
+  file = "Figures/UMAP for RHP Break Profile (GMM).html",
   selfcontained = TRUE
 )
 
 htmlwidgets::saveWidget(
   widget = plot_lhp,
-  file = "UMAP for LHP Break Profile (GMM).html",
+  file = "Figures/UMAP for LHP Break Profile (GMM).html",
   selfcontained = TRUE
 )
 
+# embed the html widgets in the knitted/rendered file
+htmltools::includeHTML("Figures/UMAP for RHP Break Profile (GMM).html")
+htmltools::includeHTML("Figures/UMAP for LHP Break Profile (GMM).html")
+
 # UMAP isn't particularly helpful in terms of interpreting the data (clusters differences).So, we'll need a different approach.
+
 ```
 
 
-```{r UMAP with facet wrapping}
+```{r UMAP with facet wrapping, echo=FALSE, warning=FALSE, message=FALSE}
+
 UMAP_rhp <- ggplot(r_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
   geom_point(alpha = 0.7, size = 2) +
   facet_wrap(~cluster) +
@@ -304,14 +338,19 @@ UMAP_lhp <- ggplot(l_umap_df, aes(x = UMAP1, y = UMAP2, color = cluster)) +
   theme(plot.title = element_text(hjust = 0.5)) +
   labs(title = "UMAP Faceted by Cluster (LHP)")
 
-ggsave(UMAP_rhp, file = "UMAP Faceted by Cluster - RHP (GMM).png", dpi = 600)
-ggsave(UMAP_lhp, file = "UMAP Faceted by Cluster - LHP (GMM).png", dpi = 600)
+ggsave(UMAP_rhp, file = "Figures/UMAP Faceted by Cluster - RHP (GMM).png", dpi = 600)
+ggsave(UMAP_lhp, file = "Figures/UMAP Faceted by Cluster - LHP (GMM).png", dpi = 600)
+
+print(UMAP_rhp)
+print(UMAP_lhp)
 
 # these plots allow us to separate the UMAP into the individual clusters
+
 ```
 
-Summarise each cluster with quartiles and IQRs
-```{r IQR summary}
+Summary of ball metrics by cluster (IQRs)
+```{r IQR summary, echo=FALSE}
+
 # RHP
 cluster_summary_rhp <- d_right %>%
   group_by(cluster) %>%
@@ -339,10 +378,15 @@ cluster_summary_lhp <- d_left %>%
 
 # save the summary data for LHP
 write.csv(cluster_summary_lhp, file = "Data/LHP Ball Metric Summary (by cluster - GMM).csv", row.names = FALSE)
+
+print(cluster_summary_rhp)
+print(cluster_summary_lhp)
+
 ```
 
+Summary of pitch frequency by cluster (auto- and manually-tagged)
+```{r pitches included in each cluster, echo=FALSE}
 
-```{r pitches included in each cluster}
 pitchtype_summary_rhp_auto <- d_right %>%
   group_by(cluster, AutoPitchType) %>%
   summarise(n = n(), .groups = "drop") %>%
@@ -382,10 +426,17 @@ pitchtype_summary_lhp_tagged <- d_left %>%
 
 # save the tagged cluster summary data for RHP
 write.csv(pitchtype_summary_lhp_tagged, file = "Data/LHP Pitch Frequency by Cluster (manually tagged - GMM).csv", row.names = FALSE)
+
+print(pitchtype_summary_rhp_auto)
+print(pitchtype_summary_lhp_auto)
+print(pitchtype_summary_rhp_tagged)
+print(pitchtype_summary_lhp_tagged)
+
 ```
 
-Visualise each cluster's ball metrics for LHP
-```{r cluster box plots + facet_wrap()}
+Visual summary of each cluster's ball metrics
+```{r cluster box plots + facet_wrap(), include=FALSE}
+
 cluster_r <- d_right %>%
   select(-TaggedPitchType, -AutoPitchType) %>%
   pivot_longer(cols = -cluster,
@@ -413,11 +464,12 @@ ggplot(cluster_l, aes(x = variable, y = value, fill = cluster)) +
   theme(plot.title = element_text(hjust = 0.5))
 
 # these plots are a little conjested, so we'll use facet_wrap() to panel them into single variables
+
 ```
 
 
-```{r cluster box plots with purrr}
-install.packages("purrr")
+```{r cluster box plots with purrr, echo=FALSE, warning=FALSE, message=FALSE}
+
 library(purrr)
 
 # split data by variable
@@ -465,23 +517,25 @@ walk(plots_l, print)
 # save each plot with a unique file name
 walk2(.x = plots_r,
       .y = names(plots_r),
-      .f = ~ ggsave(filename = paste0("RHP - ", .y, ".png"),
+      .f = ~ ggsave(filename = paste0("Figures/RHP - ", .y, ".png"),
                     plot = .x,
                     width = 7, height = 5, dpi = 600)
       )
 
 walk2(.x = plots_l,
       .y = names(plots_l),
-      .f = ~ ggsave(filename = paste0("LHP - ", .y, ".png"),
+      .f = ~ ggsave(filename = paste0("Figures/LHP - ", .y, ".png"),
                     plot = .x,
                     width = 7, height = 5, dpi = 600)
       )
 
 # these plots make it much easier to interpret since the y values are specific to each variable
+
 ```
 
 
-```{r GGally - line plot, eval=FALSE}
+```{r GGally - line plot, eval=FALSE, include=FALSE}
+
 install.packages("GGally")
 library(GGally)
 
@@ -497,11 +551,12 @@ GGally::ggparcoord(
   labs(title = "Cluster Profiles (RHP)", x = "Feature", y = "Normalized Value")
 
 # these plots are difficult to interpret as they are. Unfortunately, GGally doesn't support facet_wrap() by variable!
+  
 ```
 
 Now we just need to play around with HDBSCAN/DBSCAN
+```{r DBSCAN analysis, echo=FALSE}
 
-```{r DBSCAN analysis}
 rX_break <- scale(d_right[, features2])
 lX_break <- scale(d_left[, features2])
 
@@ -518,9 +573,12 @@ hdb_l <- hdbscan(lX_break, minPts = 20)
 # add clusters back to original df
 d_left$hdb_cluster <- as.factor(hdb_l$cluster)
 cat("Optimal number of clusters for LHP based on break profile (DBSCAN):", length(unique(hdb_l$cluster[hdb_l$cluster > 0])), "\n")
+
 ```
 
-```{r visualise DBSCAN models with UMAP}
+
+```{r visualise DBSCAN models with UMAP, echo=FALSE, warning=FALSE, message=FALSE}
+
 set.seed(0312)
 
 # right
@@ -641,20 +699,24 @@ print(plot_hdb_lhp)
 
 htmlwidgets::saveWidget(
   widget = plot_hdb_rhp,
-  file = "UMAP for RHP Break Profile (DBSCAN).html",
+  file = "Figures/UMAP for RHP Break Profile (DBSCAN).html",
   selfcontained = TRUE
 )
 
 htmlwidgets::saveWidget(
   widget = plot_hdb_lhp,
-  file = "UMAP for LHP Break Profile (DBSCAN).html",
+  file = "Figures/UMAP for LHP Break Profile (DBSCAN).html",
   selfcontained = TRUE
 )
+
+# embed the interactive plots in the knitted/rendered file
+htmltools::includeHTML("Figures/UMAP for RHP Break Profile (DBSCAN).html")
+htmltools::includeHTML("Figures/UMAP for LHP Break Profile (DBSCAN).html")
 
 ```
 
 
-```{r summary data - DBSCAN}
+```{r summary data - DBSCAN, echo=FALSE}
 
 summary_stats_rhp <- d_right %>%
   filter(hdb_cluster != 0) %>%  # exclude noise
@@ -734,11 +796,13 @@ write.csv(freq_summary_lhp_auto, file = "Data/LHP Pitch Frequency by Cluster (au
 
 Some of the clusters identified in both the GMM and HDBSCAN analyses seem to overlap, or don't necessarily look that different from each other. We are, therefore, going to create a quick similarity matrix to assess which clusters look most similar to each other (using Euclidean distance).
 
+
 $$
 \text{Distance} = \sqrt{(x_1 - x_2)^2 + (y_1 - y_2)^2 + \dots + (n_1 - n_2)^2}
 $$
 
-```{r similarity matrix}
+
+```{r similarity matrix, echo=FALSE}
 
 RHP_summary <- read.csv("Data/RHP Ball Metric Summary (by cluster - GMM).csv")
 LHP_summary <- read.csv("Data/LHP Ball Metric Summary (by cluster - GMM).csv")
@@ -783,8 +847,17 @@ pheatmap(LHP_similarity_matrix,
 
 dev.off()
 
-write.csv(RHP_similarity_matrix, "RHP Cluster Similarity Matrix.csv")
-write.csv(LHP_similarity_matrix, "LHP Cluster Similarity Matrix.csv")
+# knitr::include_graphics("Figures/RHP Cluster Similarity Matrix (Euclidean Distance).png")
+# knitr::include_graphics("Figures/LHP Cluster Similarity Matrix (Euclidean Distance).png")
+
+write.csv(RHP_similarity_matrix, "Data/RHP Cluster Similarity Matrix.csv")
+write.csv(LHP_similarity_matrix, "Data/LHP Cluster Similarity Matrix.csv")
+```
+
+```{r eval=FALSE}
+
+print(RHP_similarity_matrix)
+print(LHP_similarity_matrix)
 
 ```
 
